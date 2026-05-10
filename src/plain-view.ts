@@ -17,10 +17,10 @@ export class PlainMarkdownView extends TextFileView {
   }
 
   getDisplayText(): string {
-    return "Plain Text View";
+    return "Plain text view";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): void {
     this.editor = new EditorView({
       state: EditorState.create({ doc: "", extensions: buildExtensions() }),
       parent: this.contentEl,
@@ -49,8 +49,7 @@ export class PlainMarkdownView extends TextFileView {
     });
   }
 
-  async onClose(): Promise<void> {
+  onClose(): void {
     this.editor.destroy();
-    return Promise.resolve();
   }
 }

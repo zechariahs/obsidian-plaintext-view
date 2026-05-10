@@ -3,29 +3,28 @@ import { PlainMarkdownView, PLAIN_VIEW_TYPE } from "./plain-view";
 
 export default class PlainTextViewPlugin extends Plugin {
   private ribbonIconEl!: HTMLElement;
+  private actionAddedViews = new WeakSet<MarkdownView>();
 
-  async onload(): Promise<void> {
+  onload(): void {
     this.registerView(
       PLAIN_VIEW_TYPE,
       (leaf) => new PlainMarkdownView(leaf)
     );
 
-    // Ribbon icon
     this.ribbonIconEl = this.addRibbonIcon(
       "code-2",
-      "Toggle Plain Text View",
-      () => this.togglePlainTextView()
+      "Toggle plain text view",
+      () => void this.togglePlainTextView()
     );
 
-    // Command
     this.addCommand({
       id: "toggle-plain-text-view",
-      name: "Toggle Plain Text Markdown View",
+      name: "Toggle plain text view",
       checkCallback: (checking: boolean) => {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.extension === "md") {
           if (!checking) {
-            this.togglePlainTextView();
+            void this.togglePlainTextView();
           }
           return true;
         }
@@ -33,44 +32,34 @@ export default class PlainTextViewPlugin extends Plugin {
       },
     });
 
-    // Update ribbon icon state on active leaf change
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => this.updateRibbonIcon())
     );
 
-    // Per-note action button — add to each MarkdownView pane
     this.registerEvent(
       this.app.workspace.on("layout-change", () => {
         this.app.workspace.iterateAllLeaves((leaf) => {
-          if (leaf.view instanceof MarkdownView) {
-            const view = leaf.view as MarkdownView;
-            // Only add if not already added
-            if (!(view as any)._plaintextActionAdded) {
-              const actionEl = view.addAction(
-                "code-2",
-                "Toggle Plain Text View",
-                (_evt: MouseEvent) => {
-                  this.app.workspace.setActiveLeaf(leaf, { focus: true });
-                  this.togglePlainTextView();
-                }
-              );
-              actionEl.addClass("plaintext-view-action");
-              (view as any)._plaintextActionAdded = true;
-            }
+          if (leaf.view instanceof MarkdownView && !this.actionAddedViews.has(leaf.view)) {
+            const actionEl = leaf.view.addAction(
+              "code-2",
+              "Toggle plain text view",
+              (_evt: MouseEvent) => {
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
+                void this.togglePlainTextView();
+              }
+            );
+            actionEl.addClass("plaintext-view-action");
+            this.actionAddedViews.add(leaf.view);
           }
         });
       })
     );
   }
 
-  onunload(): void {
-    this.app.workspace.detachLeavesOfType(PLAIN_VIEW_TYPE);
-  }
-
   private async togglePlainTextView(): Promise<void> {
-    const leaf =
-      this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf ??
-      this.app.workspace.activeLeaf;
+    const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const plainView = this.app.workspace.getActiveViewOfType(PlainMarkdownView);
+    const leaf = markdownView?.leaf ?? plainView?.leaf;
 
     if (!leaf) return;
 
@@ -93,10 +82,9 @@ export default class PlainTextViewPlugin extends Plugin {
   }
 
   private updateRibbonIcon(): void {
-    const activeLeaf = this.app.workspace.activeLeaf;
-    const viewType = activeLeaf?.view?.getViewType();
+    const isPlainView = !!this.app.workspace.getActiveViewOfType(PlainMarkdownView);
 
-    if (viewType === PLAIN_VIEW_TYPE) {
+    if (isPlainView) {
       this.ribbonIconEl.addClass("is-active");
     } else {
       this.ribbonIconEl.removeClass("is-active");
